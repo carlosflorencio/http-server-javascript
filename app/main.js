@@ -1,4 +1,8 @@
 const net = require("net");
+const path = require("path")
+const fs = require("fs");
+
+const DIRECTORY = process.argv?.[3]
 
 const server = net.createServer((socket) => {
   socket.on("close", () => {
@@ -7,11 +11,9 @@ const server = net.createServer((socket) => {
 
   socket.on("data", (data) => {
     const request = Request.fromBuffer(data);
-    const response = new Response(request);
+    const response = new Response(request, socket);
 
     handlers(request, response)
-
-    response.writeToSocket(socket)
   })
 });
 
@@ -24,20 +26,43 @@ server.on("error", err => {
 function handlers(req, res) {
   if (req.path === "/") {
     res.setStatus(200)
+    res.end()
     return
   }
 
-  if (/^\/echo\/.*/.test(req.path)) {
+  if (/^\/echo\/.+/.test(req.path)) {
     res.setBody(Buffer.from(req.path.slice(6)))
+    res.end()
     return
   }
 
   if (req.path === "/user-agent") {
     res.setBody(Buffer.from(req.headers["User-Agent"]))
+    res.end()
+    return
+  }
+
+  if (/^\/files\/.+/.test(req.path)) {
+    const filename = req.path.split("/")[2]
+    const filePath = path.join(DIRECTORY, filename)
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.setStatus(404)
+        res.end()
+        return
+      }
+
+      res.setHeader("Content-Type", "application/octet-stream")
+      res.setBody(data)
+      res.end()
+    })
+
     return
   }
 
   res.setStatus(404)
+  res.end()
 }
 
 class Request {
@@ -68,13 +93,14 @@ class Request {
 }
 
 class Response {
-  constructor(request) {
+  constructor(request, socket) {
     this.req = request
     this.status = 200
     this.headers = {
       "Content-Type": "text/plain"
     }
     this.body = null
+    this.socket = socket
   }
 
   setStatus(status) {
@@ -82,7 +108,7 @@ class Response {
     return this
   }
 
-  setHeaders(key, value) {
+  setHeader(key, value) {
     this.headers[key] = value
     return this
   }
@@ -96,10 +122,7 @@ class Response {
     return this
   }
 
-  /**
-  * @param {net.Socket} socket
-  */
-  writeToSocket(socket) {
+  end() {
     let payload = `${this.req.proto} ${this.status} ${statusString(this.status)}\r\n`;
     let headers = Object.keys(this.headers).map(key => `${key}: ${this.headers[key]}`).join("\r\n");
     payload += headers + "\r\n\r\n";
@@ -108,7 +131,7 @@ class Response {
       payload += this.body;
     }
 
-    socket.end(payload)
+    this.socket.end(payload)
   }
 }
 
