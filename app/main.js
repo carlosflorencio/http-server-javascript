@@ -33,6 +33,11 @@ function handlers(req, res) {
     return
   }
 
+  if (req.path === "/user-agent") {
+    res.setBody(Buffer.from(req.headers["User-Agent"]))
+    return
+  }
+
   res.setStatus(404)
 }
 
@@ -49,10 +54,17 @@ class Request {
   * @param {Uint8Array} buffer
   */
   static fromBuffer(buffer) {
-    const firstLine = buffer.toString().split("\r\n")[0];
+    const contents = buffer.toString().split("\r\n");
+    const firstLine = contents[0];
     const [method, path, proto] = firstLine.split(" ");
 
-    return new Request(method, path, proto, {}, null)
+    const headers = {};
+    for (let i = 1; i < contents.length; i++) {
+      const [key, value] = contents[i].split(": ");
+      headers[key] = value
+    }
+
+    return new Request(method, path, proto, headers, null)
   }
 }
 
