@@ -46,17 +46,30 @@ function handlers(req, res) {
     const filename = req.path.split("/")[2]
     const filePath = path.join(DIRECTORY, filename)
 
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.setStatus(404)
-        res.end()
-        return
-      }
+    if (req.method === "GET") {
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          res.setStatus(404)
+          res.end()
+          return
+        }
 
-      res.setHeader("Content-Type", "application/octet-stream")
-      res.setBody(data)
-      res.end()
-    })
+        res.setHeader("Content-Type", "application/octet-stream")
+        res.setBody(data)
+        res.end()
+      })
+    } else {
+      fs.writeFile(filePath, req.body, (err) => {
+        if (err) {
+          res.setStatus(500)
+          res.end()
+          return
+        }
+
+        res.setStatus(201)
+        res.end()
+      })
+    }
 
     return
   }
@@ -88,7 +101,9 @@ class Request {
       headers[key] = value
     }
 
-    return new Request(method, path, proto, headers, null)
+    const body = contents[contents.length - 1] ? contents[contents.length - 1] : null;
+
+    return new Request(method, path, proto, headers, body);
   }
 }
 
