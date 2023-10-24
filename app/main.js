@@ -28,6 +28,11 @@ function handlers(req, res) {
     return
   }
 
+  if (/^\/echo\/.*/.test(req.path)) {
+    res.setBody(Buffer.from(req.path.slice(6)))
+    return
+  }
+
   res.setStatus(404)
 }
 
